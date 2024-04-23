@@ -55,43 +55,8 @@ thumbnailSize = (64, 78)
 def getThumbnailOffset(imageSize):
     return ((-imageSize[0])//2, (thumbnailSize[1] - imageSize[1])//2)
 
-commandKeywords = {
-    "unzip-abs": 1,
-    "unzip":1,
-    "parkobj-abs":1,
-    "parkobj":1,
-    "no-export":0
-}
-exportAbs = { "unzip-abs","parkobj-abs"}
-exportFolder = {"unzip","unzip-abs"}
-
-def main(argv):
-    print("Large Scenery Creator script by Spacek")
-    if len(argv)< 2 or argv[1] in ["h", "help","-h","--h"]:
-        print("""Usage:
-    scriptfile.py <input json> [options]
-
-optional arguments:
-    --unzip-abs <path to directory to put object directory>
-    --unzip <path to directory to put object directory, automatic folder name>
-    --parkobj-abs <path to file output>
-    --parkobj <path to directory to put parkobj, automatic file name>
-    --no-export
-default behavior:
-    scriptfile.py <input json> --parkobj-dir "D:/Documents/OpenRCT2/object\"""")
-        return
-    # command line arguments
-    exportPath = "D:/Documents/OpenRCT2/object"
-    exportMode = "parkobj"
-    
-    for flag in commandKeywords.keys():
-        if "--"+flag in argv:
-            exportMode = flag
-            exportPath = argv[argv.index("--"+flag)+commandKeywords[flag]]
-    
-    print("exportMode:",exportMode,"exportPath:",exportPath)
+def BuildScenery(jsonfilepath, exportPath, exportMode):
     # open the object
-    jsonfilepath = ospath.abspath(argv[1])
     jsondir = ospath.dirname(ospath.abspath(jsonfilepath))
     filename, extension = ospath.splitext(jsonfilepath)
     if extension.lower() != ".json":
@@ -180,7 +145,7 @@ default behavior:
                 pixelOffset = tileOffsetToPixel(rotatedCoords)
                 sprite = spr.Sprite.fromFile(path = imageManifest[importImageIndex], selected_colors = selectedColors)
                 sprite.colorAllInRemap(color_name = recolorTo)
-                data["images"].append({"x": sprite.x+pixelOffset[0], "y":sprite.y+pixelOffset[1]+16,"path":f'images/tile_{tileIndex}_im_{i}.png'})
+                data["images"].append({"x": sprite.x+pixelOffset[0], "y":sprite.y+pixelOffset[1]+15,"path":f'images/tile_{tileIndex}_im_{i}.png'})
                 sprites.append(sprite)
                 print("Loaded tile image '"+imageManifest[importImageIndex]+"'",sprite.image.size,"with sprite offset",(data["images"][-1]["x"],data["images"][-1]["y"]))
             except Exception as e:
@@ -230,7 +195,46 @@ default behavior:
         replace(finalPath+".zip",finalPath+".parkobj")
         print("Parkobj moved to",finalPath+".parkobj")
 
+commandKeywords = {
+    "unzip-abs": 1,
+    "unzip":1,
+    "parkobj-abs":1,
+    "parkobj":1,
+    "no-export":0
+}
+exportAbs = { "unzip-abs","parkobj-abs"}
+exportFolder = {"unzip","unzip-abs"}
 
+def main(argv):
+    print("Large Scenery Creator script by Spacek")
+    if len(argv)< 2 or argv[1] in ["h", "help","-h","--h"]:
+        print("""Usage:
+    scriptfile.py <input jsons> ... [options] ...
+
+optional arguments:
+    --unzip-abs <path to directory to put object directory>
+    --unzip <path to directory to put object directory, automatic folder name>
+    --parkobj-abs <path to file output>
+    --parkobj <path to directory to put parkobj, automatic file name>
+    --no-export
+default behavior:
+    scriptfile.py <input json> --parkobj-dir "D:/Documents/OpenRCT2/object\"""")
+        return
+    # command line arguments
+    exportPath = "D:/Documents/OpenRCT2/object"
+    exportMode = "parkobj"
+    
+    for flag in commandKeywords.keys():
+        if "--"+flag in argv:
+            exportMode = flag
+            exportPath = argv[argv.index("--"+flag)+commandKeywords[flag]]
+    
+    print("exportMode:",exportMode,"exportPath:",exportPath)
+
+    for i in range(1, len(argv)):
+        if argv[i][2:] in commandKeywords:
+            break
+        BuildScenery(argv[i], exportPath, exportMode)
 
 if __name__ == "__main__":
     main(sys.argv)
