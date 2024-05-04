@@ -238,8 +238,53 @@ def switchPalette(image: Image.Image, pal_in: Palette, pal_out: Palette, include
 
 # def generatePalette(image):
 
+distanceFunctions = [
+    lambda query, target: (target[0] - query[0])**2 + (target[1] - query[1])**2 + (target[2] - query[2])**2, # Euclidian
+    lambda query, target: abs(target[0] - query[0]) + abs(target[1] - query[1]) + abs(target[2] - query[2]), # Taxicab/Manhattan
+    lambda query, target: max(abs(target[0] - query[0]), abs(target[1] - query[1]), abs(target[2] - query[2])), # Chebyshev
+]
 
-def addPalette(image, palette: Palette = orct, dither=True, transparent_color=(0, 0, 0), include_sparkles=False, selected_colors=None, alpha_threshold=0):
+def getClosestColor(query: tuple, pal_in, distanceMethod = 0):
+    closestDistance = 255
+    closestColor = pal_in[0]
+    for color in pal_in:
+        distance = np.linalg.norm(query-color)#distanceFunctions[distanceMethod](query, color)
+        if distance < 3:
+            return color
+        if distance < closestDistance:
+            closestDistance = distance
+            closestColor = color
+    return closestColor
+
+def applyFloydSteinberg(image, pal_in, strength = 0.35):
+    pixel = np.array(image,dtype = float)
+    x_lim, y_lim = image.size
+
+    for y in range(y_lim):
+        print("Row",y)
+        for x in range(x_lim):
+            oldColor = pixel[x,y]
+            newColor = getClosestColor(oldColor, pal_in)
+            error = oldColor - newColor
+            pixel[x, y] = newColor
+            if x < x_lim - 1:
+                pixel[x+1, y] += strength * 7/16 * error
+            if y < y_lim - 1:
+                pixel[x, y+1] += strength * 5/16 * error
+                if x > 1:
+                    pixel[x-1, y+1] += strength * 3/16 * error
+                if x < x_lim - 1:
+                    pixel[x+1, y+1] += strength * 1/16 * error
+    image = Image.fromarray(pixel.astype(int),"RGB")
+    image.show()
+    return image
+
+def applyNearestNeighbor(image, pal_in):
+    pixel = np.array(image)
+    getClosestColor(pixel,pal_in)
+    return Image.fromarray(pixel,"RGB")
+
+def addPalette(image, palette: Palette = orct, dither=False, transparent_color=(0, 0, 0), include_sparkles=False, selected_colors=None, alpha_threshold=0):
     # If no transparent_color is given we choose the color from (0,0) pixel
     if not transparent_color:
         transparent_color = image.getpixel((0, 0))[:3]
@@ -258,16 +303,13 @@ def addPalette(image, palette: Palette = orct, dither=True, transparent_color=(0
             'Asked to include sparkles but given palette has no sparkles.')
 
     pal_in = palette.getReducedArray(selected_colors)
-
     pal_in = pal_in.reshape(-1, pal_in.shape[-1])
-    pal_in = np.append(np.zeros((256-len(pal_in), 3)), pal_in, axis=0)
-    pal_in = np.uint8(pal_in.flatten()).tolist()
-    p = Image.new("P", (1, 1))
-    p.putpalette(pal_in)
-    image = image.quantize(method=3, palette=p,
-                           dither=int(dither)).convert('RGBA')
-
-    return removeColorOnMask(image, mask)
+    dither = False
+    if dither:
+        image = applyFloydSteinberg(image, pal_in)
+    else:
+        image = applyNearestNeighbor(image, pal_in)
+    return removeColorOnMask(image.convert("RGBA"), mask)
 
 
 def alphaToColor(image: Image.Image, color=(0, 0, 0)):
